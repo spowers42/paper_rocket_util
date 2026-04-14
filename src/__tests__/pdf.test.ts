@@ -8,6 +8,7 @@ import {
   PAGE_SIZES_MM,
   calculateSegments,
   generateTubePdf,
+  buildLabel,
 } from "../pdf.js";
 import { cylinderPattern } from "../geometry.js";
 
@@ -122,5 +123,43 @@ describe("generateTubePdf", () => {
       const header = Buffer.from(bytes.slice(0, 5)).toString("ascii");
       expect(header).toBe("%PDF-");
     }
+  });
+
+  it("produces a valid PDF when a label is provided", async () => {
+    const pattern = cylinderPattern(18, 200, 6.35);
+    const bytes = await generateTubePdf(pattern, "A4", "Scott  ·  US-1234  ·  USA");
+    const header = Buffer.from(bytes.slice(0, 5)).toString("ascii");
+    expect(header).toBe("%PDF-");
+  });
+
+  it("produces the same page count with or without a label", async () => {
+    const pattern = cylinderPattern(18, 200, 6.35);
+    const withLabel = await generateTubePdf(pattern, "A4", "Scott  ·  US-1234  ·  USA");
+    const withoutLabel = await generateTubePdf(pattern);
+    const docWith = await PDFDocument.load(withLabel);
+    const docWithout = await PDFDocument.load(withoutLabel);
+    expect(docWith.getPageCount()).toBe(docWithout.getPageCount());
+  });
+});
+
+describe("buildLabel", () => {
+  it("combines all three fields with separator", () => {
+    expect(buildLabel("Scott", "US-1234", "USA")).toBe("Scott  ·  US-1234  ·  USA");
+  });
+
+  it("works with only a name", () => {
+    expect(buildLabel("Scott")).toBe("Scott");
+  });
+
+  it("works with name and country only", () => {
+    expect(buildLabel("Scott", undefined, "USA")).toBe("Scott  ·  USA");
+  });
+
+  it("returns undefined when no fields are provided", () => {
+    expect(buildLabel()).toBeUndefined();
+  });
+
+  it("returns undefined when all fields are empty strings", () => {
+    expect(buildLabel("", "", "")).toBeUndefined();
   });
 });

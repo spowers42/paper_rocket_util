@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, rgb, degrees, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
 import { type CylinderPattern, ALIGNMENT_MARK_LENGTH_MM } from "./geometry.js";
 
 /** Points per millimetre (72 pt/inch ÷ 25.4 mm/inch) */
@@ -16,6 +16,29 @@ export const MARGIN_MM = 10;
  * slice of the pattern so the user can align them when taping.
  */
 export const PAGE_OVERLAP_MM = 15;
+
+/** Font size for competitor label printed on the tube (pt) */
+export const LABEL_FONT_SIZE_PT = 10;
+
+/** Distance from the bottom cut line to the start of the label text (mm) */
+export const LABEL_BOTTOM_MARGIN_MM = 8;
+
+/** Distance from the left cut line to the label text baseline (mm) */
+export const LABEL_LEFT_OFFSET_MM = 5;
+
+/**
+ * Builds the competitor label string from optional name, license, and country.
+ * Only includes fields that are provided; fields are separated by " · ".
+ * Returns undefined if no fields are provided.
+ */
+export function buildLabel(
+  name?: string,
+  license?: string,
+  country?: string
+): string | undefined {
+  const parts = [name, license, country].filter(Boolean) as string[];
+  return parts.length > 0 ? parts.join("  ·  ") : undefined;
+}
 
 export const PAGE_SIZES_MM = {
   A4: { width: 210, height: 297 },
@@ -62,7 +85,8 @@ function drawPageContent(
   segment: Segment,
   pageNum: number,
   totalPages: number,
-  font: PDFFont
+  font: PDFFont,
+  label?: string
 ): void {
   const { height: pageHeightPt } = page.getSize();
   const marginPt = mm(MARGIN_MM);
@@ -174,7 +198,22 @@ function drawPageContent(
     });
   }
 
-  // 7. Page number (multi-page only), above the top margin
+  // 7. Competitor label — drawn on the last page only, near the bottom cut line,
+  //    rotated 90° so it reads upward along the tube length.
+  //    Positioned LABEL_LEFT_OFFSET_MM from the left edge, LABEL_BOTTOM_MARGIN_MM
+  //    from the bottom cut line.
+  if (label && isLastPage) {
+    page.drawText(label, {
+      x: px(LABEL_LEFT_OFFSET_MM),
+      y: py(segHeightMm) + mm(LABEL_BOTTOM_MARGIN_MM),
+      size: LABEL_FONT_SIZE_PT,
+      font,
+      color: rgb(0, 0, 0),
+      rotate: degrees(90),
+    });
+  }
+
+  // 8. Page number (multi-page only), above the top margin
   if (totalPages > 1) {
     page.drawText(`Page ${pageNum} of ${totalPages}`, {
       x: px(0),
@@ -192,7 +231,8 @@ function drawPageContent(
  */
 export async function generateTubePdf(
   pattern: CylinderPattern,
-  pageSize: PageSize = "A4"
+  pageSize: PageSize = "A4",
+  label?: string
 ): Promise<Uint8Array> {
   const pageDims = PAGE_SIZES_MM[pageSize];
   const usableHeightMm = pageDims.height - 2 * MARGIN_MM;
@@ -203,7 +243,7 @@ export async function generateTubePdf(
 
   for (let i = 0; i < segments.length; i++) {
     const page = pdfDoc.addPage([mm(pageDims.width), mm(pageDims.height)]);
-    drawPageContent(page, pattern, segments[i], i + 1, segments.length, font);
+    drawPageContent(page, pattern, segments[i], i + 1, segments.length, font, label);
   }
 
   return pdfDoc.save();
