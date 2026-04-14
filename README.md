@@ -8,10 +8,16 @@ A command-line tool that generates printable PDF flat-patterns for rolling compe
 
 ## Installation
 
-Clone the repository and install dependencies:
+Download the latest `paper-rocket.mjs` from the [Releases](https://github.com/spowers42/paper_rocket_util/releases) page and run it directly — no install step required:
 
 ```bash
-git clone <repo-url>
+node paper-rocket.mjs
+```
+
+### Install from source
+
+```bash
+git clone https://github.com/spowers42/paper_rocket_util.git
 cd paper_rocket_util
 npm install
 npm run build
@@ -25,6 +31,8 @@ After linking, the `paper-rocket` command is available globally.
 Run the tool and follow the interactive prompts:
 
 ```bash
+node paper-rocket.mjs
+# or, if installed from source:
 paper-rocket
 ```
 
@@ -71,10 +79,11 @@ Common workflows are available via [Task](https://taskfile.dev/). Run `task` wit
 ```
 task dev          # run the program without building (uses tsx)
 task build        # compile TypeScript to dist/
+task bundle       # bundle to a single paper-rocket.mjs for distribution
 task test         # run all unit tests
 task test:watch   # run tests in watch mode
 task lint         # lint source files
-task clean        # remove compiled output
+task clean        # remove compiled output and bundle
 task ci           # full check: install → build → lint → test
 ```
 

@@ -34,9 +34,13 @@ tasks:
     desc: Lint source files
     cmd: npm run lint
 
+  bundle:
+    desc: Bundle to a single paper-rocket.mjs for distribution
+    cmd: npm run bundle
+
   clean:
-    desc: Remove compiled output
-    cmd: rm -rf dist/
+    desc: Remove compiled output and bundle
+    cmd: rm -rf dist/ paper-rocket.mjs
 
   ci:
     desc: Full CI check — install, build, lint, and test
