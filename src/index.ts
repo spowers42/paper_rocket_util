@@ -4,6 +4,9 @@ import { select, input, confirm, number } from "@inquirer/prompts";
 import chalk from "chalk";
 import { VALID_DIAMETERS, DEFAULT_OVERLAP_MM, type TubeDiameter, type TubeOptions } from "./types.js";
 import { validatePositiveFloat, parsePositiveFloat } from "./validation.js";
+import { cylinderPattern, formatPatternSummary } from "./geometry.js";
+import { generateTubePdf } from "./pdf.js";
+import { writeFile } from "fs/promises";
 
 async function main() {
   console.log(chalk.bold("\nPaper Rocket Utility"));
@@ -77,7 +80,15 @@ async function main() {
   if (options.country) console.log(`  Country:    ${chalk.cyan(options.country)}`);
   console.log(`  Output:     ${chalk.cyan(options.output)}`);
   console.log(chalk.dim("─".repeat(36)));
-  console.log(chalk.yellow("\n(PDF generation not yet implemented — Milestone 2)\n"));
+
+  const pattern = cylinderPattern(options.diameter, options.length, options.overlap);
+  console.log(chalk.bold("\n" + formatPatternSummary(pattern)));
+
+  process.stdout.write(chalk.dim("\nGenerating PDF..."));
+  const pdfBytes = await generateTubePdf(pattern);
+  await writeFile(options.output, pdfBytes);
+  console.log(chalk.green(` done\n`));
+  console.log(`  ${chalk.bold("PDF written to:")} ${chalk.cyan(options.output)}\n`);
 }
 
 main().catch((err) => {

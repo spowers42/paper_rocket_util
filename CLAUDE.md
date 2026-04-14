@@ -29,7 +29,9 @@ The program is a fully interactive CLI — there are no command-line flags. The 
 
 - `src/types.ts` — all shared types and constants (`TubeDiameter`, `TubeOptions`, `VALID_DIAMETERS`, `DEFAULT_OVERLAP_MM`). The source of truth for domain values.
 - `src/validation.ts` — pure functions for input validation (`isValidDiameter`, `parsePositiveFloat`, `validatePositiveFloat`). Kept separate from `index.ts` so they can be unit tested without mocking the prompt layer.
-- `src/index.ts` — the prompt orchestration loop. Collects all user input, assembles a `TubeOptions` object, and will invoke PDF generation (not yet implemented).
+- `src/geometry.ts` — flat-pattern geometry calculations. `cylinderPattern()` returns a `CylinderPattern` with body width, total width, fold line position, cut line positions, and alignment mark positions. `formatPatternSummary()` renders it for stdout.
+- `src/pdf.ts` — PDF generation via `pdf-lib`. `generateTubePdf(pattern, pageSize)` returns a `Uint8Array`. Long tubes are tiled across multiple pages with a `PAGE_OVERLAP_MM` (15 mm) overlap zone between pages for alignment. `calculateSegments()` handles the tiling math. Page sizes: A4 (default) and Letter.
+- `src/index.ts` — the prompt orchestration loop. Collects all user input, assembles a `TubeOptions` object, computes the flat-pattern geometry, generates the PDF, and writes it to disk.
 
 **Key domain rules:**
 - All diameters are **inner diameter** (the motor bore). Flat-pattern body width = `π × inner diameter`.
