@@ -1,5 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
-import { cylinderPattern, formatPatternSummary } from "../geometry.js";
+import { cylinderPattern, formatPatternSummary, calculateAlignmentMarks, ALIGNMENT_MARK_SPACING_MM } from "../geometry.js";
 
 // Hand-computed reference values: bodyWidth = π × diameter
 const DIAMETER_CASES = [
@@ -55,6 +55,46 @@ describe("cylinderPattern", () => {
   });
 });
 
+describe("calculateAlignmentMarks", () => {
+  it("places marks at every 25 mm by default", () => {
+    const marks = calculateAlignmentMarks(100);
+    expect(marks.map((m) => m.y)).toEqual([25, 50, 75]);
+  });
+
+  it("does not place a mark at y=0 or y=length", () => {
+    const marks = calculateAlignmentMarks(100);
+    expect(marks.every((m) => m.y > 0 && m.y < 100)).toBe(true);
+  });
+
+  it("returns no marks when tube is shorter than one spacing interval", () => {
+    const marks = calculateAlignmentMarks(20);
+    expect(marks).toHaveLength(0);
+  });
+
+  it("returns exactly one mark when length equals one spacing interval", () => {
+    const marks = calculateAlignmentMarks(ALIGNMENT_MARK_SPACING_MM * 2);
+    expect(marks).toHaveLength(1);
+    expect(marks[0].y).toBe(ALIGNMENT_MARK_SPACING_MM);
+  });
+
+  it("respects a custom spacing", () => {
+    const marks = calculateAlignmentMarks(100, 20);
+    expect(marks.map((m) => m.y)).toEqual([20, 40, 60, 80]);
+  });
+});
+
+describe("cylinderPattern alignment marks", () => {
+  it("includes alignment marks in the pattern", () => {
+    const p = cylinderPattern(18, 100, 6.35);
+    expect(p.alignmentMarks).toEqual([{ y: 25 }, { y: 50 }, { y: 75 }]);
+  });
+
+  it("has no alignment marks for a very short tube", () => {
+    const p = cylinderPattern(18, 20, 6.35);
+    expect(p.alignmentMarks).toHaveLength(0);
+  });
+});
+
 describe("formatPatternSummary", () => {
   it("includes all key dimensions", () => {
     const p = cylinderPattern(18, 200, DEFAULT_OVERLAP);
@@ -64,5 +104,19 @@ describe("formatPatternSummary", () => {
     expect(summary).toContain(p.bodyWidth.toFixed(3));
     expect(summary).toContain(p.totalWidth.toFixed(3));
     expect(summary).toContain(DEFAULT_OVERLAP.toFixed(3));
+  });
+
+  it("includes alignment mark positions", () => {
+    const p = cylinderPattern(18, 100, DEFAULT_OVERLAP);
+    const summary = formatPatternSummary(p);
+    expect(summary).toContain("25.0");
+    expect(summary).toContain("50.0");
+    expect(summary).toContain("75.0");
+  });
+
+  it("shows 'none' when there are no alignment marks", () => {
+    const p = cylinderPattern(18, 20, DEFAULT_OVERLAP);
+    const summary = formatPatternSummary(p);
+    expect(summary).toContain("none");
   });
 });
