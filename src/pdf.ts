@@ -1,5 +1,6 @@
 import { PDFDocument, rgb, degrees, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
-import { type CylinderPattern, ALIGNMENT_MARK_LENGTH_MM } from "./geometry.js";
+import { type CylinderPattern, ALIGNMENT_MARK_LENGTH_MM, FIN_MARK_LENGTH_MM, calculateFinMarks, type FinCount } from "./geometry.js";
+import { type LabelColor, DEFAULT_LABEL_COLOR } from "./colors.js";
 
 /** Points per millimetre (72 pt/inch ÷ 25.4 mm/inch) */
 export const MM_TO_PT = 72 / 25.4;
@@ -87,7 +88,9 @@ function drawPageContent(
   totalPages: number,
   font: PDFFont,
   boldFont: PDFFont,
-  label?: string
+  label?: string,
+  labelColor?: LabelColor,
+  finCount?: FinCount
 ): void {
   const { height: pageHeightPt } = page.getSize();
   const marginPt = mm(MARGIN_MM);
@@ -201,20 +204,44 @@ function drawPageContent(
 
   // 7. Competitor label — drawn on the last page only, near the bottom cut line,
   //    rotated 90° so it reads upward along the tube length.
-  //    Positioned LABEL_LEFT_OFFSET_MM from the left edge, LABEL_BOTTOM_MARGIN_MM
-  //    from the bottom cut line.
+  //    With fin marks: centered in the first bay between fins. After 90° CCW rotation,
+  //    the baseline is the right edge of the visible glyphs (characters extend leftward),
+  //    so x is shifted right by half the font height to visually center the text.
+  //    Without fin marks: uses LABEL_LEFT_OFFSET_MM.
   if (label && isLastPage) {
+    const { r, g, b } = labelColor ?? DEFAULT_LABEL_COLOR;
+    const fontHeightMm = LABEL_FONT_SIZE_PT / MM_TO_PT;
+    const labelXMm = finCount
+      ? pattern.bodyWidth / (2 * finCount) + fontHeightMm / 2
+      : LABEL_LEFT_OFFSET_MM;
     page.drawText(label, {
-      x: px(LABEL_LEFT_OFFSET_MM),
+      x: px(labelXMm),
       y: py(segHeightMm) + mm(LABEL_BOTTOM_MARGIN_MM),
       size: LABEL_FONT_SIZE_PT,
       font: boldFont,
-      color: rgb(0, 0, 0),
+      color: rgb(r, g, b),
       rotate: degrees(90),
     });
   }
 
-  // 8. Page number (multi-page only), above the top margin
+  // 8. Fin alignment marks — drawn on the last page only, at the bottom cut line,
+  //    extending upward FIN_MARK_LENGTH_MM. Marks are evenly spaced across the body width.
+  if (finCount && isLastPage) {
+    const finXPositions = calculateFinMarks(pattern.bodyWidth, finCount);
+    const finMarkTopY = py(segHeightMm - FIN_MARK_LENGTH_MM);
+    const finMarkBottomY = py(segHeightMm);
+
+    for (const finX of finXPositions) {
+      page.drawLine({
+        start: { x: px(finX), y: finMarkBottomY },
+        end: { x: px(finX), y: finMarkTopY },
+        thickness: 0.8,
+        color: rgb(0, 0, 0),
+      });
+    }
+  }
+
+  // 9. Page number (multi-page only), above the top margin
   if (totalPages > 1) {
     page.drawText(`Page ${pageNum} of ${totalPages}`, {
       x: px(0),
@@ -233,7 +260,9 @@ function drawPageContent(
 export async function generateTubePdf(
   pattern: CylinderPattern,
   pageSize: PageSize = "A4",
-  label?: string
+  label?: string,
+  labelColor?: LabelColor,
+  finCount?: FinCount
 ): Promise<Uint8Array> {
   const pageDims = PAGE_SIZES_MM[pageSize];
   const usableHeightMm = pageDims.height - 2 * MARGIN_MM;
@@ -245,7 +274,7 @@ export async function generateTubePdf(
 
   for (let i = 0; i < segments.length; i++) {
     const page = pdfDoc.addPage([mm(pageDims.width), mm(pageDims.height)]);
-    drawPageContent(page, pattern, segments[i], i + 1, segments.length, font, boldFont, label);
+    drawPageContent(page, pattern, segments[i], i + 1, segments.length, font, boldFont, label, labelColor, finCount);
   }
 
   return pdfDoc.save();
