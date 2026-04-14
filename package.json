@@ -10,7 +10,8 @@
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "lint": "eslint src",
-    "test": "node --experimental-vm-modules --no-warnings=ExperimentalWarning node_modules/.bin/jest"
+    "test": "node --experimental-vm-modules --no-warnings=ExperimentalWarning node_modules/.bin/jest",
+    "bundle": "esbuild src/index.ts --bundle --outfile=paper-rocket.mjs --format=esm --platform=node"
   },
   "dependencies": {
     "@inquirer/prompts": "^8.4.1",
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@jest/globals": "^29.0.0",
     "@types/node": "^22.0.0",
+    "esbuild": "^0.28.0",
     "eslint": "^9.0.0",
     "jest": "^29.0.0",
     "ts-jest": "^29.0.0",
