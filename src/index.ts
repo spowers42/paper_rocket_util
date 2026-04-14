@@ -5,7 +5,7 @@ import chalk from "chalk";
 import { VALID_DIAMETERS, DEFAULT_OVERLAP_MM, type TubeDiameter, type TubeOptions } from "./types.js";
 import { validatePositiveFloat, parsePositiveFloat } from "./validation.js";
 import { cylinderPattern, formatPatternSummary } from "./geometry.js";
-import { generateTubePdf } from "./pdf.js";
+import { generateTubePdf, buildLabel } from "./pdf.js";
 import { writeFile } from "fs/promises";
 
 async function main() {
@@ -84,8 +84,10 @@ async function main() {
   const pattern = cylinderPattern(options.diameter, options.length, options.overlap);
   console.log(chalk.bold("\n" + formatPatternSummary(pattern)));
 
+  const label = buildLabel(options.name, options.license, options.country);
+
   process.stdout.write(chalk.dim("\nGenerating PDF..."));
-  const pdfBytes = await generateTubePdf(pattern);
+  const pdfBytes = await generateTubePdf(pattern, "A4", label);
   await writeFile(options.output, pdfBytes);
   console.log(chalk.green(` done\n`));
   console.log(`  ${chalk.bold("PDF written to:")} ${chalk.cyan(options.output)}\n`);
