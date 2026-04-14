@@ -29,7 +29,8 @@ The program is a fully interactive CLI — there are no command-line flags. The 
 
 - `src/types.ts` — all shared types and constants (`TubeDiameter`, `TubeOptions`, `VALID_DIAMETERS`, `DEFAULT_OVERLAP_MM`). The source of truth for domain values.
 - `src/validation.ts` — pure functions for input validation (`isValidDiameter`, `parsePositiveFloat`, `validatePositiveFloat`). Kept separate from `index.ts` so they can be unit tested without mocking the prompt layer.
-- `src/index.ts` — the prompt orchestration loop. Collects all user input, assembles a `TubeOptions` object, and will invoke PDF generation (not yet implemented).
+- `src/geometry.ts` — flat-pattern geometry calculations. `cylinderPattern()` returns a `CylinderPattern` with body width, total width, fold line position, and cut line positions. `formatPatternSummary()` renders it for stdout.
+- `src/index.ts` — the prompt orchestration loop. Collects all user input, assembles a `TubeOptions` object, computes and displays the flat-pattern geometry, and will invoke PDF generation (not yet implemented).
 
 **Key domain rules:**
 - All diameters are **inner diameter** (the motor bore). Flat-pattern body width = `π × inner diameter`.
