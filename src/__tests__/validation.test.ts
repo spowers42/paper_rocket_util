@@ -1,5 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
-import { isValidDiameter, parsePositiveFloat, validatePositiveFloat } from "../validation.js";
+import { isValidDiameter, parsePositiveFloat, validatePositiveFloat, validatePositiveNumber } from "../validation.js";
 
 describe("isValidDiameter", () => {
   it.each([13, 18, 24, 40])("accepts %i mm", (d) => {
@@ -41,6 +41,28 @@ describe("parsePositiveFloat", () => {
 
   it("returns null for Infinity", () => {
     expect(parsePositiveFloat("Infinity")).toBeNull();
+  });
+});
+
+describe("validatePositiveNumber", () => {
+  it("returns true for a positive number", () => {
+    expect(validatePositiveNumber(200)).toBe(true);
+  });
+
+  it("returns true for a positive decimal", () => {
+    expect(validatePositiveNumber(6.35)).toBe(true);
+  });
+
+  it("returns an error string for undefined (empty input)", () => {
+    expect(validatePositiveNumber(undefined)).toBe("Please enter a positive number.");
+  });
+
+  it("returns an error string for zero", () => {
+    expect(validatePositiveNumber(0)).toBe("Please enter a positive number.");
+  });
+
+  it("returns an error string for a negative number", () => {
+    expect(validatePositiveNumber(-10)).toBe("Please enter a positive number.");
   });
 });
 

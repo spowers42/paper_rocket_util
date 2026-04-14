@@ -163,3 +163,35 @@ describe("buildLabel", () => {
     expect(buildLabel("", "", "")).toBeUndefined();
   });
 });
+
+describe("generateTubePdf with color and fin marks", () => {
+  it("produces a valid PDF with a non-black label color", async () => {
+    const pattern = cylinderPattern(18, 200, 6.35);
+    const color = { name: "Blue", r: 0.05, g: 0.3, b: 0.95 };
+    const bytes = await generateTubePdf(pattern, "A4", "Scott", color);
+    const header = Buffer.from(bytes.slice(0, 5)).toString("ascii");
+    expect(header).toBe("%PDF-");
+  });
+
+  it("produces a valid PDF with 3 fin marks", async () => {
+    const pattern = cylinderPattern(18, 200, 6.35);
+    const bytes = await generateTubePdf(pattern, "A4", undefined, undefined, 3);
+    const header = Buffer.from(bytes.slice(0, 5)).toString("ascii");
+    expect(header).toBe("%PDF-");
+  });
+
+  it("produces a valid PDF with 4 fin marks", async () => {
+    const pattern = cylinderPattern(24, 200, 6.35);
+    const bytes = await generateTubePdf(pattern, "A4", undefined, undefined, 4);
+    const header = Buffer.from(bytes.slice(0, 5)).toString("ascii");
+    expect(header).toBe("%PDF-");
+  });
+
+  it("produces a valid PDF with label, color, and fin marks combined", async () => {
+    const pattern = cylinderPattern(18, 200, 6.35);
+    const color = { name: "Red", r: 1, g: 0.05, b: 0.05 };
+    const bytes = await generateTubePdf(pattern, "A4", "Scott  ·  US-1234  ·  USA", color, 4);
+    const doc = await PDFDocument.load(bytes);
+    expect(doc.getPageCount()).toBe(1);
+  });
+});

@@ -3,9 +3,10 @@
 import { select, input, confirm, number } from "@inquirer/prompts";
 import chalk from "chalk";
 import { VALID_DIAMETERS, DEFAULT_OVERLAP_MM, type TubeDiameter, type TubeOptions } from "./types.js";
-import { validatePositiveFloat, parsePositiveFloat } from "./validation.js";
-import { cylinderPattern, formatPatternSummary } from "./geometry.js";
+import { validatePositiveFloat, validatePositiveNumber, parsePositiveFloat } from "./validation.js";
+import { cylinderPattern, formatPatternSummary, type FinCount } from "./geometry.js";
 import { generateTubePdf, buildLabel } from "./pdf.js";
+import { LABEL_COLORS, DEFAULT_LABEL_COLOR, type LabelColor } from "./colors.js";
 import { writeFile } from "fs/promises";
 
 async function main() {
@@ -22,7 +23,8 @@ async function main() {
 
   const length = await number({
     message: "Tube length (mm):",
-    validate: (n) => (n !== undefined && n > 0 ? true : "Please enter a positive number."),
+    required: true,
+    validate: validatePositiveNumber,
   }) as number;
 
   const overlapInput = await input({
@@ -41,15 +43,42 @@ async function main() {
     if (addTransition) {
       transitionLength = await number({
         message: "Transition section length (mm):",
-        validate: (n) => (n !== undefined && n > 0 ? true : "Please enter a positive number."),
+        required: true,
+        validate: validatePositiveNumber,
       }) as number;
-
     }
   }
 
   const nameInput = await input({ message: "Competitor name (leave blank to skip):" });
   const licenseInput = await input({ message: "License number (leave blank to skip):" });
   const countryInput = await input({ message: "Country (leave blank to skip):" });
+
+  const hasLabel = !!(nameInput || licenseInput || countryInput);
+
+  let labelColor: LabelColor = DEFAULT_LABEL_COLOR;
+  if (hasLabel) {
+    labelColor = await select<LabelColor>({
+      message: "Label text color:",
+      choices: LABEL_COLORS.map((c) => ({ name: c.name, value: c })),
+    });
+  }
+
+  let finCount: FinCount | undefined;
+  if (diameter !== 40) {
+    const addFinMarks = await confirm({
+      message: "Add fin alignment marks?",
+      default: true,
+    });
+    if (addFinMarks) {
+      finCount = await select<FinCount>({
+        message: "Number of fins:",
+        choices: [
+          { name: "3 fins (120° spacing)", value: 3 },
+          { name: "4 fins (90° spacing)",  value: 4 },
+        ],
+      });
+    }
+  }
 
   const outputPath = await input({
     message: "Output PDF file path:",
@@ -64,6 +93,8 @@ async function main() {
     name: nameInput || undefined,
     license: licenseInput || undefined,
     country: countryInput || undefined,
+    labelColor,
+    finCount,
     transitionLength,
   };
 
@@ -75,9 +106,11 @@ async function main() {
   console.log(`  Overlap:    ${chalk.cyan(options.overlap + " mm")}`);
   if (options.transitionLength)
     console.log(`  Transition: ${chalk.cyan(options.transitionLength + " mm")} (40 → 13 mm)`);
-  if (options.name)    console.log(`  Name:       ${chalk.cyan(options.name)}`);
-  if (options.license) console.log(`  License:    ${chalk.cyan(options.license)}`);
-  if (options.country) console.log(`  Country:    ${chalk.cyan(options.country)}`);
+  if (options.name)     console.log(`  Name:       ${chalk.cyan(options.name)}`);
+  if (options.license)  console.log(`  License:    ${chalk.cyan(options.license)}`);
+  if (options.country)  console.log(`  Country:    ${chalk.cyan(options.country)}`);
+  if (hasLabel)         console.log(`  Label color:${chalk.cyan(" " + options.labelColor!.name)}`);
+  if (options.finCount) console.log(`  Fin marks:  ${chalk.cyan(options.finCount + " fins")}`);
   console.log(`  Output:     ${chalk.cyan(options.output)}`);
   console.log(chalk.dim("─".repeat(36)));
 
@@ -87,7 +120,7 @@ async function main() {
   const label = buildLabel(options.name, options.license, options.country);
 
   process.stdout.write(chalk.dim("\nGenerating PDF..."));
-  const pdfBytes = await generateTubePdf(pattern, "A4", label);
+  const pdfBytes = await generateTubePdf(pattern, "A4", label, options.labelColor, options.finCount);
   await writeFile(options.output, pdfBytes);
   console.log(chalk.green(` done\n`));
   console.log(`  ${chalk.bold("PDF written to:")} ${chalk.cyan(options.output)}\n`);

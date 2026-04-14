@@ -22,7 +22,12 @@
 export const ALIGNMENT_MARK_SPACING_MM = 50;
 
 /** Length of each alignment mark tick in mm */
-export const ALIGNMENT_MARK_LENGTH_MM = 5;
+export const ALIGNMENT_MARK_LENGTH_MM = 2.5;
+
+/** Length of fin alignment mark lines in mm */
+export const FIN_MARK_LENGTH_MM = 20;
+
+export type FinCount = 3 | 4;
 
 export interface AlignmentMark {
   /** Y position of the mark along the tube length (mm) */
@@ -62,6 +67,16 @@ export function calculateAlignmentMarks(length: number, spacing: number = ALIGNM
     marks.push({ y });
   }
   return marks;
+}
+
+/**
+ * Calculates evenly-spaced fin alignment mark x-positions along the tube circumference.
+ * The first mark is at x=0 (the seam) and marks repeat every bodyWidth/finCount mm.
+ * Not available for FAI (40 mm) tubes.
+ */
+export function calculateFinMarks(bodyWidth: number, finCount: FinCount): number[] {
+  const spacing = bodyWidth / finCount;
+  return Array.from({ length: finCount }, (_, i) => i * spacing);
 }
 
 /**

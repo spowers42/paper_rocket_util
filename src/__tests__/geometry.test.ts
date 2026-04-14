@@ -1,5 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
-import { cylinderPattern, formatPatternSummary, calculateAlignmentMarks, ALIGNMENT_MARK_SPACING_MM } from "../geometry.js";
+import { cylinderPattern, formatPatternSummary, calculateAlignmentMarks, calculateFinMarks, ALIGNMENT_MARK_SPACING_MM } from "../geometry.js";
 
 // Hand-computed reference values: bodyWidth = π × diameter
 const DIAMETER_CASES = [
@@ -118,5 +118,44 @@ describe("formatPatternSummary", () => {
     const p = cylinderPattern(18, 40, DEFAULT_OVERLAP);
     const summary = formatPatternSummary(p);
     expect(summary).toContain("none");
+  });
+});
+
+describe("calculateFinMarks", () => {
+  const bodyWidth = Math.PI * 18; // ~56.55 mm
+
+  it("returns 3 evenly spaced positions for 3 fins", () => {
+    const marks = calculateFinMarks(bodyWidth, 3);
+    expect(marks).toHaveLength(3);
+    expect(marks[0]).toBeCloseTo(0, 6);
+    expect(marks[1]).toBeCloseTo(bodyWidth / 3, 6);
+    expect(marks[2]).toBeCloseTo((2 * bodyWidth) / 3, 6);
+  });
+
+  it("returns 4 evenly spaced positions for 4 fins", () => {
+    const marks = calculateFinMarks(bodyWidth, 4);
+    expect(marks).toHaveLength(4);
+    expect(marks[0]).toBeCloseTo(0, 6);
+    expect(marks[1]).toBeCloseTo(bodyWidth / 4, 6);
+    expect(marks[2]).toBeCloseTo(bodyWidth / 2, 6);
+    expect(marks[3]).toBeCloseTo((3 * bodyWidth) / 4, 6);
+  });
+
+  it("all marks are within the body width", () => {
+    for (const finCount of [3, 4] as const) {
+      const marks = calculateFinMarks(bodyWidth, finCount);
+      expect(marks.every((x) => x >= 0 && x < bodyWidth)).toBe(true);
+    }
+  });
+
+  it("spacing is consistent between marks", () => {
+    const marks3 = calculateFinMarks(bodyWidth, 3);
+    expect(marks3[1] - marks3[0]).toBeCloseTo(marks3[2] - marks3[1], 6);
+
+    const marks4 = calculateFinMarks(bodyWidth, 4);
+    const spacing = marks4[1] - marks4[0];
+    for (let i = 1; i < marks4.length; i++) {
+      expect(marks4[i] - marks4[i - 1]).toBeCloseTo(spacing, 6);
+    }
   });
 });
