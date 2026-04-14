@@ -16,12 +16,12 @@ node paper-rocket.mjs
 
 ### Install from source
 
+Requires [Task](https://taskfile.dev/) (`brew install go-task`):
+
 ```bash
 git clone https://github.com/spowers42/paper_rocket_util.git
 cd paper_rocket_util
-npm install
-npm run build
-npm link
+task install
 ```
 
 After linking, the `paper-rocket` command is available globally.
@@ -77,14 +77,15 @@ For FAI tubes (40 mm), an optional transition section can be generated. This is 
 Common workflows are available via [Task](https://taskfile.dev/). Run `task` with no arguments to list them:
 
 ```
-task dev          # run the program without building (uses tsx)
-task build        # compile TypeScript to dist/
-task bundle       # bundle to a single paper-rocket.mjs for distribution
-task test         # run all unit tests
-task test:watch   # run tests in watch mode
-task lint         # lint source files
-task clean        # remove compiled output and bundle
-task ci           # full check: install → build → lint → test
+task dev                  # run the program without building (uses tsx)
+task build                # compile TypeScript to dist/
+task bundle               # bundle to a single paper-rocket.mjs for distribution
+task test                 # run all unit tests
+task test:watch           # run tests in watch mode
+task lint                 # lint source files
+task clean                # remove compiled output and bundle
+task ci                   # full check: install → build → lint → test
+task install              # install, build, and link for global use
 ```
 
 Install Task via Homebrew: `brew install go-task`

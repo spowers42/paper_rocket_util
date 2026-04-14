@@ -6,8 +6,11 @@ tasks:
     cmd: task --list
 
   install:
-    desc: Install npm dependencies
-    cmd: npm install
+    desc: Install dependencies, build, and link for global use
+    cmds:
+      - npm install
+      - task: build
+      - npm link
 
   build:
     desc: Compile TypeScript to dist/
@@ -45,7 +48,7 @@ tasks:
   ci:
     desc: Full CI check — install, build, lint, and test
     cmds:
-      - task: install
+      - npm install
       - task: build
       - task: lint
       - task: test
