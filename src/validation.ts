@@ -24,3 +24,11 @@ export function parsePositiveFloat(value: string): number | null {
 export function validatePositiveFloat(value: string): true | string {
   return parsePositiveFloat(value) !== null ? true : "Please enter a positive number.";
 }
+
+/**
+ * Inquirer-compatible validator for the `number` prompt type.
+ * Guards against undefined (empty input) and non-positive values.
+ */
+export function validatePositiveNumber(value: number | undefined): true | string {
+  return value !== undefined && value > 0 ? true : "Please enter a positive number.";
+}
