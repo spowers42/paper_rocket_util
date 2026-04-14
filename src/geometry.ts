@@ -19,7 +19,7 @@
  */
 
 /** Spacing between alignment marks in mm */
-export const ALIGNMENT_MARK_SPACING_MM = 25;
+export const ALIGNMENT_MARK_SPACING_MM = 50;
 
 /** Length of each alignment mark tick in mm */
 export const ALIGNMENT_MARK_LENGTH_MM = 5;

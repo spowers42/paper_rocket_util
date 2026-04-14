@@ -56,18 +56,18 @@ describe("cylinderPattern", () => {
 });
 
 describe("calculateAlignmentMarks", () => {
-  it("places marks at every 25 mm by default", () => {
-    const marks = calculateAlignmentMarks(100);
-    expect(marks.map((m) => m.y)).toEqual([25, 50, 75]);
+  it("places marks at every 50 mm by default", () => {
+    const marks = calculateAlignmentMarks(200);
+    expect(marks.map((m) => m.y)).toEqual([50, 100, 150]);
   });
 
   it("does not place a mark at y=0 or y=length", () => {
-    const marks = calculateAlignmentMarks(100);
-    expect(marks.every((m) => m.y > 0 && m.y < 100)).toBe(true);
+    const marks = calculateAlignmentMarks(200);
+    expect(marks.every((m) => m.y > 0 && m.y < 200)).toBe(true);
   });
 
   it("returns no marks when tube is shorter than one spacing interval", () => {
-    const marks = calculateAlignmentMarks(20);
+    const marks = calculateAlignmentMarks(40);
     expect(marks).toHaveLength(0);
   });
 
@@ -85,12 +85,12 @@ describe("calculateAlignmentMarks", () => {
 
 describe("cylinderPattern alignment marks", () => {
   it("includes alignment marks in the pattern", () => {
-    const p = cylinderPattern(18, 100, 6.35);
-    expect(p.alignmentMarks).toEqual([{ y: 25 }, { y: 50 }, { y: 75 }]);
+    const p = cylinderPattern(18, 200, 6.35);
+    expect(p.alignmentMarks).toEqual([{ y: 50 }, { y: 100 }, { y: 150 }]);
   });
 
   it("has no alignment marks for a very short tube", () => {
-    const p = cylinderPattern(18, 20, 6.35);
+    const p = cylinderPattern(18, 40, 6.35);
     expect(p.alignmentMarks).toHaveLength(0);
   });
 });
@@ -107,15 +107,15 @@ describe("formatPatternSummary", () => {
   });
 
   it("includes alignment mark positions", () => {
-    const p = cylinderPattern(18, 100, DEFAULT_OVERLAP);
+    const p = cylinderPattern(18, 200, DEFAULT_OVERLAP);
     const summary = formatPatternSummary(p);
-    expect(summary).toContain("25.0");
     expect(summary).toContain("50.0");
-    expect(summary).toContain("75.0");
+    expect(summary).toContain("100.0");
+    expect(summary).toContain("150.0");
   });
 
   it("shows 'none' when there are no alignment marks", () => {
-    const p = cylinderPattern(18, 20, DEFAULT_OVERLAP);
+    const p = cylinderPattern(18, 40, DEFAULT_OVERLAP);
     const summary = formatPatternSummary(p);
     expect(summary).toContain("none");
   });
