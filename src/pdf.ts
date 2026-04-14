@@ -18,13 +18,13 @@ export const MARGIN_MM = 10;
 export const PAGE_OVERLAP_MM = 15;
 
 /** Font size for competitor label printed on the tube (pt) */
-export const LABEL_FONT_SIZE_PT = 10;
+export const LABEL_FONT_SIZE_PT = 11;
 
 /** Distance from the bottom cut line to the start of the label text (mm) */
 export const LABEL_BOTTOM_MARGIN_MM = 8;
 
 /** Distance from the left cut line to the label text baseline (mm) */
-export const LABEL_LEFT_OFFSET_MM = 5;
+export const LABEL_LEFT_OFFSET_MM = 7;
 
 /**
  * Builds the competitor label string from optional name, license, and country.
@@ -86,6 +86,7 @@ function drawPageContent(
   pageNum: number,
   totalPages: number,
   font: PDFFont,
+  boldFont: PDFFont,
   label?: string
 ): void {
   const { height: pageHeightPt } = page.getSize();
@@ -207,7 +208,7 @@ function drawPageContent(
       x: px(LABEL_LEFT_OFFSET_MM),
       y: py(segHeightMm) + mm(LABEL_BOTTOM_MARGIN_MM),
       size: LABEL_FONT_SIZE_PT,
-      font,
+      font: boldFont,
       color: rgb(0, 0, 0),
       rotate: degrees(90),
     });
@@ -240,10 +241,11 @@ export async function generateTubePdf(
 
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   for (let i = 0; i < segments.length; i++) {
     const page = pdfDoc.addPage([mm(pageDims.width), mm(pageDims.height)]);
-    drawPageContent(page, pattern, segments[i], i + 1, segments.length, font, label);
+    drawPageContent(page, pattern, segments[i], i + 1, segments.length, font, boldFont, label);
   }
 
   return pdfDoc.save();
