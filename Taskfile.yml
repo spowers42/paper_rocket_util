@@ -1,0 +1,47 @@
+version: "3"
+
+tasks:
+  default:
+    desc: List all available tasks
+    cmd: task --list
+
+  install:
+    desc: Install npm dependencies
+    cmd: npm install
+
+  build:
+    desc: Compile TypeScript to dist/
+    cmd: npm run build
+    sources:
+      - src/**/*.ts
+      - tsconfig.json
+    generates:
+      - dist/**/*.js
+
+  dev:
+    desc: Run the program without building (uses tsx)
+    cmd: npm run dev
+
+  test:
+    desc: Run all unit tests
+    cmd: npm test
+
+  test:watch:
+    desc: Run tests in watch mode
+    cmd: npm test -- --watch
+
+  lint:
+    desc: Lint source files
+    cmd: npm run lint
+
+  clean:
+    desc: Remove compiled output
+    cmd: rm -rf dist/
+
+  ci:
+    desc: Full CI check — install, build, lint, and test
+    cmds:
+      - task: install
+      - task: build
+      - task: lint
+      - task: test
