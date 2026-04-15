@@ -2,12 +2,15 @@
 
 import { select, input, confirm, number } from "@inquirer/prompts";
 import chalk from "chalk";
-import { VALID_DIAMETERS, DEFAULT_OVERLAP_MM, type TubeDiameter, type TubeOptions } from "./types.js";
+import { VALID_DIAMETERS, DEFAULT_OVERLAP_MM, type TubeDiameter, type TubeOptions, type TubeGraphic } from "./types.js";
 import { validatePositiveFloat, validatePositiveNumber, parsePositiveFloat } from "./validation.js";
 import { cylinderPattern, formatPatternSummary, type FinCount } from "./geometry.js";
 import { generateTubePdf, buildLabel } from "./pdf.js";
 import { LABEL_COLORS, DEFAULT_LABEL_COLOR, type LabelColor } from "./colors.js";
-import { writeFile } from "fs/promises";
+import { findFlag, flagCdnUrl } from "./flags.js";
+import { detectImageFormat } from "./images.js";
+import { expandTilde } from "./paths.js";
+import { readFile, writeFile, access } from "fs/promises";
 
 async function main() {
   console.log(chalk.bold("\nPaper Rocket Utility"));
@@ -55,6 +58,48 @@ async function main() {
 
   const hasLabel = !!(nameInput || licenseInput || countryInput);
 
+  // Graphic prompt: offer the country's flag if it's a known FAI nation, plus custom image
+  let graphic: TubeGraphic | undefined;
+  const matchedFlag = countryInput ? findFlag(countryInput) : undefined;
+  const graphicChoices = [
+    { name: "None", value: "none" },
+    ...(matchedFlag ? [{ name: `Flag: ${matchedFlag.country}`, value: "flag" }] : []),
+    { name: "Custom image file (PNG or JPEG)", value: "custom" },
+  ];
+
+  const graphicChoice = await select({
+    message: "Add graphic to tube?",
+    choices: graphicChoices,
+  });
+
+  if (graphicChoice === "flag") {
+    process.stdout.write(chalk.dim("Fetching flag..."));
+    const response = await fetch(flagCdnUrl(matchedFlag!.code));
+    if (!response.ok) throw new Error(`Failed to fetch flag: ${response.statusText}`);
+    const buffer = await response.arrayBuffer();
+    graphic = { bytes: new Uint8Array(buffer), format: "png" };
+    console.log(chalk.green(" done"));
+  } else if (graphicChoice === "custom") {
+    const filePath = await input({
+      message: "Image file path:",
+      validate: async (v) => {
+        if (!v.trim()) return "Please enter a file path.";
+        const resolved = expandTilde(v.trim());
+        try {
+          await access(resolved);
+        } catch {
+          return `File not found: ${resolved}`;
+        }
+        const bytes = new Uint8Array(await readFile(resolved));
+        if (!detectImageFormat(bytes)) return "Unsupported format — please provide a PNG or JPEG file.";
+        return true;
+      },
+    });
+    const bytes = new Uint8Array(await readFile(expandTilde(filePath)));
+    const format = detectImageFormat(bytes)!;
+    graphic = { bytes, format };
+  }
+
   let labelColor: LabelColor = DEFAULT_LABEL_COLOR;
   if (hasLabel) {
     labelColor = await select<LabelColor>({
@@ -96,6 +141,7 @@ async function main() {
     labelColor,
     finCount,
     transitionLength,
+    graphic,
   };
 
   console.log(chalk.dim("\n" + "─".repeat(36)));
@@ -111,6 +157,7 @@ async function main() {
   if (options.country)  console.log(`  Country:    ${chalk.cyan(options.country)}`);
   if (hasLabel)         console.log(`  Label color:${chalk.cyan(" " + options.labelColor!.name)}`);
   if (options.finCount) console.log(`  Fin marks:  ${chalk.cyan(options.finCount + " fins")}`);
+  if (options.graphic)  console.log(`  Graphic:    ${chalk.cyan(options.graphic.format.toUpperCase())}`);
   console.log(`  Output:     ${chalk.cyan(options.output)}`);
   console.log(chalk.dim("─".repeat(36)));
 
@@ -120,7 +167,7 @@ async function main() {
   const label = buildLabel(options.name, options.license, options.country);
 
   process.stdout.write(chalk.dim("\nGenerating PDF..."));
-  const pdfBytes = await generateTubePdf(pattern, "A4", label, options.labelColor, options.finCount);
+  const pdfBytes = await generateTubePdf(pattern, "A4", label, options.labelColor, options.finCount, options.graphic);
   await writeFile(options.output, pdfBytes);
   console.log(chalk.green(` done\n`));
   console.log(`  ${chalk.bold("PDF written to:")} ${chalk.cyan(options.output)}\n`);

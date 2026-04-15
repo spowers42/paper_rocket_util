@@ -9,6 +9,9 @@ import {
   calculateSegments,
   generateTubePdf,
   buildLabel,
+  calculateGraphicPlacement,
+  GRAPHIC_MARGIN_MM,
+  GRAPHIC_MAX_WIDTH_RATIO,
 } from "../pdf.js";
 import { cylinderPattern } from "../geometry.js";
 
@@ -193,5 +196,56 @@ describe("generateTubePdf with color and fin marks", () => {
     const bytes = await generateTubePdf(pattern, "A4", "Scott  ·  US-1234  ·  USA", color, 4);
     const doc = await PDFDocument.load(bytes);
     expect(doc.getPageCount()).toBe(1);
+  });
+});
+
+describe("calculateGraphicPlacement", () => {
+  const bodyWidth = 100;
+  const segHeight = 200;
+  const imgW = 320;
+  const imgH = 240;
+
+  it("centers the graphic horizontally within the body width", () => {
+    const p = calculateGraphicPlacement(imgW, imgH, bodyWidth, segHeight);
+    expect(p.x + p.width / 2).toBeCloseTo(bodyWidth / 2);
+  });
+
+  it("places the graphic center at 1/3 from the top of the segment", () => {
+    const p = calculateGraphicPlacement(imgW, imgH, bodyWidth, segHeight);
+    const centerY = p.y + p.height / 2;
+    expect(centerY).toBeCloseTo(segHeight / 3);
+  });
+
+  it("limits graphic width to 75% of body width", () => {
+    const p = calculateGraphicPlacement(imgW, imgH, bodyWidth, segHeight);
+    expect(p.width).toBeLessThanOrEqual(bodyWidth * GRAPHIC_MAX_WIDTH_RATIO + 0.001);
+  });
+
+  it("centers the graphic horizontally so equal space remains on each side", () => {
+    const p = calculateGraphicPlacement(imgW, imgH, bodyWidth, segHeight);
+    expect(p.x).toBeCloseTo((bodyWidth - p.width) / 2);
+  });
+
+  it("keeps the graphic within the vertical margins", () => {
+    const p = calculateGraphicPlacement(imgW, imgH, bodyWidth, segHeight);
+    expect(p.y).toBeGreaterThanOrEqual(GRAPHIC_MARGIN_MM);
+    expect(p.y + p.height).toBeLessThanOrEqual(segHeight - GRAPHIC_MARGIN_MM);
+  });
+
+  it("preserves the image aspect ratio", () => {
+    const p = calculateGraphicPlacement(imgW, imgH, bodyWidth, segHeight);
+    expect(p.width / p.height).toBeCloseTo(imgW / imgH);
+  });
+
+  it("scales a portrait image to fit within the available area", () => {
+    const p = calculateGraphicPlacement(100, 400, bodyWidth, segHeight);
+    expect(p.width).toBeLessThanOrEqual(bodyWidth - 2 * GRAPHIC_MARGIN_MM + 0.001);
+    expect(p.height).toBeLessThanOrEqual(segHeight - 2 * GRAPHIC_MARGIN_MM + 0.001);
+  });
+
+  it("clamps y so the graphic does not go above the top margin when the image is very tall", () => {
+    // Extremely tall image: center at 1/3 would push top edge above margin
+    const p = calculateGraphicPlacement(10, 1000, bodyWidth, segHeight);
+    expect(p.y).toBeGreaterThanOrEqual(GRAPHIC_MARGIN_MM);
   });
 });

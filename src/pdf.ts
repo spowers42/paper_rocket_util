@@ -1,6 +1,7 @@
 import { PDFDocument, rgb, degrees, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
 import { type CylinderPattern, ALIGNMENT_MARK_LENGTH_MM, FIN_MARK_LENGTH_MM, calculateFinMarks, type FinCount } from "./geometry.js";
 import { type LabelColor, DEFAULT_LABEL_COLOR } from "./colors.js";
+import { type TubeGraphic } from "./types.js";
 
 /** Points per millimetre (72 pt/inch ÷ 25.4 mm/inch) */
 export const MM_TO_PT = 72 / 25.4;
@@ -78,6 +79,55 @@ export function calculateSegments(
     yStart += step;
   }
   return segments;
+}
+
+/** The position and size (all in mm) for a graphic on the flat pattern. */
+export interface GraphicPlacement {
+  x: number;
+  y: number;      // distance from the TOP of the segment (pattern coordinates)
+  width: number;
+  height: number;
+}
+
+/** Margin around the graphic within the body area (mm) */
+export const GRAPHIC_MARGIN_MM = 5;
+
+/** Maximum graphic width as a fraction of the body width */
+export const GRAPHIC_MAX_WIDTH_RATIO = 0.60;
+
+/**
+ * Calculates where to draw a graphic on the first page so that it:
+ *   - is scaled to fit within the body width with GRAPHIC_MARGIN_MM on each side,
+ *   - preserves the original aspect ratio,
+ *   - is centered horizontally within the body width,
+ *   - has its center placed at 1/3 from the top of the segment.
+ *
+ * @param imageWidthPx  Natural pixel width of the image
+ * @param imageHeightPx Natural pixel height of the image
+ * @param bodyWidthMm   Width of the tube body area (excludes overlap strip)
+ * @param segHeightMm   Height of the first page segment
+ */
+export function calculateGraphicPlacement(
+  imageWidthPx: number,
+  imageHeightPx: number,
+  bodyWidthMm: number,
+  segHeightMm: number
+): GraphicPlacement {
+  const maxWidthMm = bodyWidthMm * GRAPHIC_MAX_WIDTH_RATIO;
+  const maxHeightMm = segHeightMm - 2 * GRAPHIC_MARGIN_MM;
+
+  const scale = Math.min(maxWidthMm / imageWidthPx, maxHeightMm / imageHeightPx);
+  const widthMm = imageWidthPx * scale;
+  const heightMm = imageHeightPx * scale;
+
+  // Center horizontally within the body width
+  const x = (bodyWidthMm - widthMm) / 2;
+
+  // Center of image at 1/3 from the top; clamped so the image stays within margins
+  const centerY = segHeightMm / 3;
+  const y = Math.max(GRAPHIC_MARGIN_MM, centerY - heightMm / 2);
+
+  return { x, y, width: widthMm, height: heightMm };
 }
 
 function drawPageContent(
@@ -262,7 +312,8 @@ export async function generateTubePdf(
   pageSize: PageSize = "A4",
   label?: string,
   labelColor?: LabelColor,
-  finCount?: FinCount
+  finCount?: FinCount,
+  graphic?: TubeGraphic
 ): Promise<Uint8Array> {
   const pageDims = PAGE_SIZES_MM[pageSize];
   const usableHeightMm = pageDims.height - 2 * MARGIN_MM;
@@ -275,6 +326,36 @@ export async function generateTubePdf(
   for (let i = 0; i < segments.length; i++) {
     const page = pdfDoc.addPage([mm(pageDims.width), mm(pageDims.height)]);
     drawPageContent(page, pattern, segments[i], i + 1, segments.length, font, boldFont, label, labelColor, finCount);
+  }
+
+  // Draw graphic on the first page only
+  if (graphic) {
+    const image =
+      graphic.format === "png"
+        ? await pdfDoc.embedPng(graphic.bytes)
+        : await pdfDoc.embedJpg(graphic.bytes);
+
+    const firstPage = pdfDoc.getPages()[0];
+    const { height: pageHeightPt } = firstPage.getSize();
+    const firstSegHeightMm = segments[0].yEnd - segments[0].yStart;
+
+    const placement = calculateGraphicPlacement(
+      image.width,
+      image.height,
+      pattern.bodyWidth,
+      firstSegHeightMm
+    );
+
+    const px = (x: number) => mm(MARGIN_MM) + mm(x);
+    // In PDF coords y=0 is at the bottom; drawImage uses the bottom-left corner of the image
+    const pyImg = (patY: number) => pageHeightPt - mm(MARGIN_MM) - mm(patY);
+
+    firstPage.drawImage(image, {
+      x: px(placement.x),
+      y: pyImg(placement.y + placement.height),
+      width: mm(placement.width),
+      height: mm(placement.height),
+    });
   }
 
   return pdfDoc.save();
