@@ -1,5 +1,13 @@
 import type { LabelColor } from "./colors.js";
 import type { FinCount } from "./geometry.js";
+import type { ImageFormat } from "./images.js";
+
+export type { ImageFormat };
+
+export interface TubeGraphic {
+  bytes: Uint8Array;
+  format: ImageFormat;
+}
 
 export const VALID_DIAMETERS = [13, 18, 24, 40] as const;
 export type TubeDiameter = (typeof VALID_DIAMETERS)[number];
@@ -17,4 +25,5 @@ export interface TubeOptions {
   labelColor?: LabelColor;   // text color for competitor label
   finCount?: FinCount;       // 3 or 4 fins; undefined = no fin marks; not available for FAI (40 mm)
   transitionLength?: number; // mm, FAI only (diameter 40)
+  graphic?: TubeGraphic;     // optional image printed on the first page
 }
