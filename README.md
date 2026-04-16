@@ -53,7 +53,11 @@ The tool guides you through the following steps:
 5. **Competitor name** — printed on the tube; leave blank to skip
 6. **License number** — printed on the tube; leave blank to skip
 7. **Country** — printed on the tube; leave blank to skip
-8. **Output file path** — where to save the PDF, defaults to `tube.pdf`
+8. **Graphic** — optionally print an image on the tube pattern; if a known FAI nation was entered as the country, the corresponding flag can be fetched automatically; alternatively, provide a local PNG or JPEG file path
+9. **Label text color** *(if name, license, or country was entered)* — choose a color for the competitor label text
+10. **Fin alignment marks** *(non-FAI diameters only)* — optionally add tick marks spaced evenly around the circumference for 3-fin or 4-fin layouts
+11. **Page size** — Letter (8.5 × 11 in, default) or A4 (210 × 297 mm)
+12. **Output file path** — where to save the PDF, defaults to `tube.pdf`
 
 A summary of your inputs is shown before the PDF is written.
 
@@ -68,9 +72,11 @@ A summary of your inputs is shown before the PDF is written.
 
 ### Flat-Pattern Geometry
 
-All diameters are **inner diameter**. The flat-pattern body width is exactly `π × inner diameter`, so one wrap of paper closes the tube to the correct bore. The overlap strip is added beyond that circumference as a glue flap.
+All diameters are **inner diameter**. The flat-pattern body width is exactly `π × inner diameter`, so one wrap of paper closes the tube to the correct bore. The overlap strip is added beyond that circumference as a glue flap. The overlap region is shaded grey on the printed pattern.
 
-For FAI tubes (40 mm), an optional transition section can be generated. This is a truncated cone (frustum) that steps down from the 40 mm body tube to a 13 mm tube. Its flat pattern is an annular sector.
+Long tubes that exceed the printable area are tiled across multiple pages with a 15 mm overlap zone between pages for alignment.
+
+For FAI tubes (40 mm), an optional transition section can be generated. This is a truncated cone (frustum) that steps down from the 40 mm body tube to a 13 mm tube. Its flat pattern is an annular sector. A 10 mm shoulder strip for the 40 mm end is printed on the same page to minimise paper use.
 
 ## Development
 

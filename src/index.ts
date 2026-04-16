@@ -2,7 +2,7 @@
 
 import { select, input, confirm, number } from "@inquirer/prompts";
 import chalk from "chalk";
-import { VALID_DIAMETERS, DEFAULT_OVERLAP_MM, type TubeDiameter, type TubeOptions, type TubeGraphic } from "./types.js";
+import { VALID_DIAMETERS, DEFAULT_OVERLAP_MM, DEFAULT_PAGE_SIZE, type TubeDiameter, type TubeOptions, type TubeGraphic, type PageSize } from "./types.js";
 import { validatePositiveFloat, validatePositiveNumber, parsePositiveFloat } from "./validation.js";
 import { cylinderPattern, formatPatternSummary, frustumPattern, formatFrustumSummary, type FinCount } from "./geometry.js";
 import { generateTubePdf, buildLabel } from "./pdf.js";
@@ -125,6 +125,15 @@ async function main() {
     }
   }
 
+  const pageSize = await select<PageSize>({
+    message: "Page size:",
+    choices: [
+      { name: "Letter (8.5 × 11 in)", value: "Letter" },
+      { name: "A4 (210 × 297 mm)",    value: "A4" },
+    ],
+    default: DEFAULT_PAGE_SIZE,
+  });
+
   const outputPath = await input({
     message: "Output PDF file path:",
     default: "tube.pdf",
@@ -134,6 +143,7 @@ async function main() {
     diameter,
     length,
     overlap,
+    pageSize,
     output: outputPath,
     name: nameInput || undefined,
     license: licenseInput || undefined,
@@ -158,6 +168,7 @@ async function main() {
   if (hasLabel)         console.log(`  Label color:${chalk.cyan(" " + options.labelColor!.name)}`);
   if (options.finCount) console.log(`  Fin marks:  ${chalk.cyan(options.finCount + " fins")}`);
   if (options.graphic)  console.log(`  Graphic:    ${chalk.cyan(options.graphic.format.toUpperCase())}`);
+  console.log(`  Page size:  ${chalk.cyan(options.pageSize)}`);
   console.log(`  Output:     ${chalk.cyan(options.output)}`);
   console.log(chalk.dim("─".repeat(36)));
 
@@ -174,7 +185,7 @@ async function main() {
   const label = buildLabel(options.name, options.license, options.country);
 
   process.stdout.write(chalk.dim("\nGenerating PDF..."));
-  const pdfBytes = await generateTubePdf(pattern, "A4", label, options.labelColor, options.finCount, options.graphic, transitionPattern);
+  const pdfBytes = await generateTubePdf(pattern, options.pageSize, label, options.labelColor, options.finCount, options.graphic, transitionPattern);
   await writeFile(options.output, pdfBytes);
   console.log(chalk.green(` done\n`));
   console.log(`  ${chalk.bold("PDF written to:")} ${chalk.cyan(options.output)}\n`);

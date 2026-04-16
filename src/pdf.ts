@@ -1,7 +1,7 @@
 import { PDFDocument, rgb, degrees, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
 import { type CylinderPattern, type FrustumPattern, ALIGNMENT_MARK_LENGTH_MM, ALIGNMENT_MARK_SPACING_MM, FIN_MARK_LENGTH_MM, calculateFinMarks, calculateAlignmentMarks, cylinderPattern, type FinCount } from "./geometry.js";
 import { type LabelColor, DEFAULT_LABEL_COLOR } from "./colors.js";
-import { type TubeGraphic } from "./types.js";
+import { type TubeGraphic, type PageSize, DEFAULT_PAGE_SIZE } from "./types.js";
 
 /** Points per millimetre (72 pt/inch ÷ 25.4 mm/inch) */
 export const MM_TO_PT = 72 / 25.4;
@@ -47,7 +47,7 @@ export const PAGE_SIZES_MM = {
   Letter: { width: 215.9, height: 279.4 },
 } as const;
 
-export type PageSize = keyof typeof PAGE_SIZES_MM;
+export type { PageSize } from "./types.js";
 
 /** A slice of the tube pattern rendered onto one page */
 export interface Segment {
@@ -531,7 +531,7 @@ function drawShoulderStrip(page: PDFPage, shoulder: CylinderPattern, layoutTopMm
  */
 export async function generateTubePdf(
   pattern: CylinderPattern,
-  pageSize: PageSize = "A4",
+  pageSize: PageSize = DEFAULT_PAGE_SIZE,
   label?: string,
   labelColor?: LabelColor,
   finCount?: FinCount,
