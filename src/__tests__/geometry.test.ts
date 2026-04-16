@@ -1,5 +1,8 @@
 import { describe, it, expect } from "@jest/globals";
-import { cylinderPattern, formatPatternSummary, calculateAlignmentMarks, calculateFinMarks, ALIGNMENT_MARK_SPACING_MM } from "../geometry.js";
+import {
+  cylinderPattern, formatPatternSummary, calculateAlignmentMarks, calculateFinMarks, ALIGNMENT_MARK_SPACING_MM,
+  frustumPattern, formatFrustumSummary, FAI_LARGE_DIAMETER_MM, FAI_SMALL_DIAMETER_MM,
+} from "../geometry.js";
 
 // Hand-computed reference values: bodyWidth = π × diameter
 const DIAMETER_CASES = [
@@ -157,5 +160,88 @@ describe("calculateFinMarks", () => {
     for (let i = 1; i < marks4.length; i++) {
       expect(marks4[i] - marks4[i - 1]).toBeCloseTo(spacing, 6);
     }
+  });
+});
+
+describe("frustumPattern", () => {
+  const overlap = 6.35;
+
+  it("stores the input length and overlap", () => {
+    const p = frustumPattern(75, overlap);
+    expect(p.length).toBe(75);
+    expect(p.overlap).toBe(overlap);
+  });
+
+  it("has correct FAI large and small diameters", () => {
+    const p = frustumPattern(50, overlap);
+    expect(p.largeDiameter).toBe(FAI_LARGE_DIAMETER_MM);
+    expect(p.smallDiameter).toBe(FAI_SMALL_DIAMETER_MM);
+  });
+
+  it("computes correct slant height from axial length", () => {
+    // r1=6.5, r2=20, h=50 → slant = sqrt(13.5² + 50²)
+    const p = frustumPattern(50, overlap);
+    expect(p.slantHeight).toBeCloseTo(Math.sqrt(13.5 ** 2 + 50 ** 2), 6);
+  });
+
+  it("computes correct outer radius", () => {
+    const p = frustumPattern(50, overlap);
+    const slant = Math.sqrt(13.5 ** 2 + 50 ** 2);
+    expect(p.outerRadius).toBeCloseTo((20 * slant) / 13.5, 6);
+  });
+
+  it("computes correct inner radius", () => {
+    const p = frustumPattern(50, overlap);
+    const slant = Math.sqrt(13.5 ** 2 + 50 ** 2);
+    expect(p.innerRadius).toBeCloseTo((6.5 * slant) / 13.5, 6);
+  });
+
+  it("inner radius equals outer radius minus slant height", () => {
+    const p = frustumPattern(50, overlap);
+    expect(p.outerRadius - p.innerRadius).toBeCloseTo(p.slantHeight, 6);
+  });
+
+  it("outer arc length equals large-end circumference", () => {
+    const p = frustumPattern(50, overlap);
+    expect(p.outerRadius * p.sectorAngle).toBeCloseTo(2 * Math.PI * 20, 6);
+  });
+
+  it("inner arc length equals small-end circumference", () => {
+    const p = frustumPattern(50, overlap);
+    expect(p.innerRadius * p.sectorAngle).toBeCloseTo(2 * Math.PI * 6.5, 6);
+  });
+
+  it("sector angle is positive and less than 2π", () => {
+    for (const len of [30, 50, 80, 120]) {
+      const p = frustumPattern(len, overlap);
+      expect(p.sectorAngle).toBeGreaterThan(0);
+      expect(p.sectorAngle).toBeLessThan(2 * Math.PI);
+    }
+  });
+
+  it("longer sections produce smaller sector angles", () => {
+    const short = frustumPattern(30, overlap);
+    const long = frustumPattern(100, overlap);
+    expect(long.sectorAngle).toBeLessThan(short.sectorAngle);
+  });
+});
+
+describe("formatFrustumSummary", () => {
+  it("includes all key dimensions", () => {
+    const p = frustumPattern(50, 6.35);
+    const s = formatFrustumSummary(p);
+    expect(s).toContain("40");
+    expect(s).toContain("13");
+    expect(s).toContain("50.00");
+    expect(s).toContain(p.slantHeight.toFixed(3));
+    expect(s).toContain(p.outerRadius.toFixed(3));
+    expect(s).toContain(p.innerRadius.toFixed(3));
+  });
+
+  it("includes sector angle in degrees", () => {
+    const p = frustumPattern(50, 6.35);
+    const s = formatFrustumSummary(p);
+    const expectedDeg = ((p.sectorAngle * 180) / Math.PI).toFixed(2);
+    expect(s).toContain(expectedDeg);
   });
 });

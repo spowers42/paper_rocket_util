@@ -1,5 +1,5 @@
 import { PDFDocument, rgb, degrees, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
-import { type CylinderPattern, ALIGNMENT_MARK_LENGTH_MM, FIN_MARK_LENGTH_MM, calculateFinMarks, type FinCount } from "./geometry.js";
+import { type CylinderPattern, type FrustumPattern, ALIGNMENT_MARK_LENGTH_MM, ALIGNMENT_MARK_SPACING_MM, FIN_MARK_LENGTH_MM, calculateFinMarks, calculateAlignmentMarks, cylinderPattern, type FinCount } from "./geometry.js";
 import { type LabelColor, DEFAULT_LABEL_COLOR } from "./colors.js";
 import { type TubeGraphic } from "./types.js";
 
@@ -303,6 +303,228 @@ function drawPageContent(
   }
 }
 
+/** Number of line segments used to approximate each arc on the frustum page */
+const FRUSTUM_ARC_SEGMENTS = 180;
+
+/**
+ * Returns PDF-point coordinates for a point at angle α from the downward vertical
+ * (α = 0 is directly below the apex, positive α sweeps clockwise),
+ * at radius rMm from the apex located at (cxPt, cyPt) in PDF coordinates.
+ */
+function frustumPoint(
+  cxPt: number,
+  cyPt: number,
+  rMm: number,
+  alpha: number
+): { x: number; y: number } {
+  return {
+    x: cxPt + mm(rMm) * Math.sin(alpha),
+    y: cyPt - mm(rMm) * Math.cos(alpha),
+  };
+}
+
+/**
+ * Draws an arc as a polyline of FRUSTUM_ARC_SEGMENTS line segments.
+ * alpha1 → alpha2 measured from the downward vertical; positive = clockwise.
+ */
+function drawFrustumArc(
+  page: PDFPage,
+  cxPt: number,
+  cyPt: number,
+  radiusMm: number,
+  alpha1: number,
+  alpha2: number,
+  thickness: number,
+  color: ReturnType<typeof rgb>,
+  dashArray?: number[]
+): void {
+  const N = FRUSTUM_ARC_SEGMENTS;
+  let prev = frustumPoint(cxPt, cyPt, radiusMm, alpha1);
+  for (let i = 1; i <= N; i++) {
+    const α = alpha1 + ((alpha2 - alpha1) * i) / N;
+    const curr = frustumPoint(cxPt, cyPt, radiusMm, α);
+    page.drawLine({ start: prev, end: curr, thickness, color, ...(dashArray ? { dashArray } : {}) });
+    prev = curr;
+  }
+}
+
+/**
+ * Fills an annular wedge (between radii R1 and R2 at angles alpha1..alpha2)
+ * with a solid grey background by drawing densely-packed radial lines.
+ *
+ * The outer arc length of the overlap strip equals `overlap` mm regardless of
+ * R2, so a fixed line count gives consistent density for any transition length.
+ */
+function fillOverlapWedge(
+  page: PDFPage,
+  cxPt: number,
+  cyPt: number,
+  R1: number,
+  R2: number,
+  alpha1: number,
+  alpha2: number,
+  overlapMm: number
+): void {
+  // One line per ~0.3 mm of arc length at the outer edge → solid coverage.
+  const N = Math.ceil(overlapMm / 0.3) + 1;
+  // Line thickness wide enough to close the gap between adjacent lines.
+  const thickness = (mm(overlapMm) / N) * 2.2;
+  const grey = rgb(0.92, 0.92, 0.92);
+  for (let i = 0; i <= N; i++) {
+    const α = alpha1 + ((alpha2 - alpha1) * i) / N;
+    page.drawLine({
+      start: frustumPoint(cxPt, cyPt, R1, α),
+      end: frustumPoint(cxPt, cyPt, R2, α),
+      thickness,
+      color: grey,
+    });
+  }
+}
+
+/**
+ * Draws the frustum (transition section) flat-pattern onto a single PDF page.
+ * No text is drawn — the pattern is geometry only.
+ *
+ * Layout: apex at the top-centre of the content area, sector opens downward.
+ * The outer arc (large end, 40 mm ID) is at the bottom; the inner arc
+ * (small end, 13 mm ID) is above it. The overlap wedge is on the right.
+ */
+function drawFrustumPage(page: PDFPage, pattern: FrustumPattern): void {
+  const { width: pageWidthPt, height: pageHeightPt } = page.getSize();
+  const { outerRadius: R2, innerRadius: R1, sectorAngle: θ, overlap } = pattern;
+  const overlapAngle = overlap / R2;
+
+  // Sector angle bounds — main body centred on the downward vertical (α = 0)
+  const αLeft = -(θ / 2);
+  const αFold = θ / 2;
+  const αRight = θ / 2 + overlapAngle;
+
+  // Apex centred horizontally, with a small top margin
+  const usableWidthMm = pageWidthPt / MM_TO_PT - 2 * MARGIN_MM;
+  const cxPt = mm(MARGIN_MM) + mm(usableWidthMm / 2);
+  const cyPt = pageHeightPt - mm(MARGIN_MM) - mm(5);
+
+  const black = rgb(0, 0, 0);
+
+  // 1. Grey overlap wedge fill (drawn first so outlines render on top)
+  fillOverlapWedge(page, cxPt, cyPt, R1, R2, αFold, αRight, overlap);
+
+  // 2. Outer arc (large end) — full span including overlap
+  drawFrustumArc(page, cxPt, cyPt, R2, αLeft, αRight, 0.5, black);
+
+  // 3. Inner arc (small end) — full span including overlap
+  drawFrustumArc(page, cxPt, cyPt, R1, αLeft, αRight, 0.5, black);
+
+  // 4. Left radial cut line
+  page.drawLine({
+    start: frustumPoint(cxPt, cyPt, R1, αLeft),
+    end: frustumPoint(cxPt, cyPt, R2, αLeft),
+    thickness: 0.5,
+    color: black,
+  });
+
+  // 5. Right radial cut line (outer edge of overlap strip)
+  page.drawLine({
+    start: frustumPoint(cxPt, cyPt, R1, αRight),
+    end: frustumPoint(cxPt, cyPt, R2, αRight),
+    thickness: 0.5,
+    color: black,
+  });
+
+  // 6. Fold line (dashed) at the body / overlap boundary
+  page.drawLine({
+    start: frustumPoint(cxPt, cyPt, R1, αFold),
+    end: frustumPoint(cxPt, cyPt, R2, αFold),
+    thickness: 0.5,
+    color: black,
+    dashArray: [mm(3), mm(2)],
+  });
+
+  // 7. Alignment marks at ALIGNMENT_MARK_SPACING_MM intervals along the
+  //    slant height (i.e. at radii R1+50, R1+100, … < R2), drawn on the
+  //    left radial edge and the fold line.
+  //
+  //    The tick direction is tangential (perpendicular to the radial edge):
+  //      left edge  → increasing-α direction = (cos αLeft,  sin αLeft)
+  //      fold line  → decreasing-α direction = (-cos αFold, -sin αFold)
+  const tickLenPt = mm(ALIGNMENT_MARK_LENGTH_MM);
+  for (let r = R1 + ALIGNMENT_MARK_SPACING_MM; r < R2; r += ALIGNMENT_MARK_SPACING_MM) {
+    const leftPt = frustumPoint(cxPt, cyPt, r, αLeft);
+    page.drawLine({
+      start: leftPt,
+      end: { x: leftPt.x + tickLenPt * Math.cos(αLeft), y: leftPt.y + tickLenPt * Math.sin(αLeft) },
+      thickness: 0.5,
+      color: black,
+    });
+
+    const foldPt = frustumPoint(cxPt, cyPt, r, αFold);
+    page.drawLine({
+      start: foldPt,
+      end: { x: foldPt.x - tickLenPt * Math.cos(αFold), y: foldPt.y - tickLenPt * Math.sin(αFold) },
+      thickness: 0.5,
+      color: black,
+    });
+  }
+}
+
+/**
+ * Draws the shoulder piece flat-pattern strip onto an existing page.
+ * No text is drawn. The strip is centred horizontally and its top edge is placed
+ * at `layoutTopMm` mm below the top content margin.
+ *
+ * This is called after drawFrustumPage so both patterns share one sheet.
+ */
+function drawShoulderStrip(page: PDFPage, shoulder: CylinderPattern, layoutTopMm: number): void {
+  const { width: pageWidthPt, height: pageHeightPt } = page.getSize();
+
+  const patWidthPt = mm(shoulder.totalWidth);
+  const patHeightPt = mm(shoulder.length);
+
+  // Centre horizontally; position top edge at layoutTopMm from the top margin
+  const patLeft = (pageWidthPt - patWidthPt) / 2;
+  const patTop = pageHeightPt - mm(MARGIN_MM + layoutTopMm);
+  const patBottom = patTop - patHeightPt;
+
+  const black = rgb(0, 0, 0);
+
+  // 1. Grey overlap strip
+  page.drawRectangle({
+    x: patLeft + mm(shoulder.bodyWidth),
+    y: patBottom,
+    width: mm(shoulder.overlap),
+    height: patHeightPt,
+    color: rgb(0.92, 0.92, 0.92),
+  });
+
+  // 2. Border (cut lines — top, bottom, left, right)
+  page.drawRectangle({
+    x: patLeft,
+    y: patBottom,
+    width: patWidthPt,
+    height: patHeightPt,
+    borderColor: black,
+    borderWidth: 0.5,
+  });
+
+  // 3. Fold line (dashed) at x = bodyWidth
+  page.drawLine({
+    start: { x: patLeft + mm(shoulder.bodyWidth), y: patBottom },
+    end: { x: patLeft + mm(shoulder.bodyWidth), y: patTop },
+    thickness: 0.5,
+    color: black,
+    dashArray: [mm(3), mm(2)],
+  });
+
+  // 4. Alignment mark ticks — the shoulder is only 10 mm tall so there are
+  //    none at the default 50 mm spacing, but we draw them if present.
+  const tickLenPt = mm(ALIGNMENT_MARK_LENGTH_MM);
+  for (const mark of shoulder.alignmentMarks) {
+    const markY = patTop - mm(mark.y);
+    page.drawLine({ start: { x: patLeft, y: markY }, end: { x: patLeft + tickLenPt, y: markY }, thickness: 0.5, color: black });
+    page.drawLine({ start: { x: patLeft + mm(shoulder.bodyWidth), y: markY }, end: { x: patLeft + mm(shoulder.bodyWidth) - tickLenPt, y: markY }, thickness: 0.5, color: black });
+  }
+}
+
 /**
  * Generates a PDF containing the flat-pattern for the given cylinder pattern.
  * Long tubes are tiled across multiple pages with an overlap zone for alignment.
@@ -313,7 +535,8 @@ export async function generateTubePdf(
   label?: string,
   labelColor?: LabelColor,
   finCount?: FinCount,
-  graphic?: TubeGraphic
+  graphic?: TubeGraphic,
+  frustum?: FrustumPattern
 ): Promise<Uint8Array> {
   const pageDims = PAGE_SIZES_MM[pageSize];
   const usableHeightMm = pageDims.height - 2 * MARGIN_MM;
@@ -326,6 +549,19 @@ export async function generateTubePdf(
   for (let i = 0; i < segments.length; i++) {
     const page = pdfDoc.addPage([mm(pageDims.width), mm(pageDims.height)]);
     drawPageContent(page, pattern, segments[i], i + 1, segments.length, font, boldFont, label, labelColor, finCount);
+  }
+
+  // Append a combined page: transition section + shoulder piece (shared sheet)
+  if (frustum) {
+    const combinedPage = pdfDoc.addPage([mm(pageDims.width), mm(pageDims.height)]);
+    drawFrustumPage(combinedPage, frustum);
+
+    // The frustum apex sits 5 mm below the top margin; the outer arc ends
+    // frustum.outerRadius mm below the apex. Add a 12 mm gap, then the shoulder.
+    const FRUSTUM_APEX_TOP_MM = 5;
+    const shoulderTopMm = FRUSTUM_APEX_TOP_MM + frustum.outerRadius + 12;
+    const shoulderPattern = cylinderPattern(frustum.largeDiameter, 10, frustum.overlap);
+    drawShoulderStrip(combinedPage, shoulderPattern, shoulderTopMm);
   }
 
   // Draw graphic on the first page only
