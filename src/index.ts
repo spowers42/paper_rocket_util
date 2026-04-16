@@ -4,7 +4,7 @@ import { select, input, confirm, number } from "@inquirer/prompts";
 import chalk from "chalk";
 import { VALID_DIAMETERS, DEFAULT_OVERLAP_MM, type TubeDiameter, type TubeOptions, type TubeGraphic } from "./types.js";
 import { validatePositiveFloat, validatePositiveNumber, parsePositiveFloat } from "./validation.js";
-import { cylinderPattern, formatPatternSummary, type FinCount } from "./geometry.js";
+import { cylinderPattern, formatPatternSummary, frustumPattern, formatFrustumSummary, type FinCount } from "./geometry.js";
 import { generateTubePdf, buildLabel } from "./pdf.js";
 import { LABEL_COLORS, DEFAULT_LABEL_COLOR, type LabelColor } from "./colors.js";
 import { findFlag, flagCdnUrl } from "./flags.js";
@@ -164,10 +164,17 @@ async function main() {
   const pattern = cylinderPattern(options.diameter, options.length, options.overlap);
   console.log(chalk.bold("\n" + formatPatternSummary(pattern)));
 
+  const transitionPattern = options.transitionLength !== undefined
+    ? frustumPattern(options.transitionLength, options.overlap)
+    : undefined;
+  if (transitionPattern) {
+    console.log(chalk.bold("\n" + formatFrustumSummary(transitionPattern)));
+  }
+
   const label = buildLabel(options.name, options.license, options.country);
 
   process.stdout.write(chalk.dim("\nGenerating PDF..."));
-  const pdfBytes = await generateTubePdf(pattern, "A4", label, options.labelColor, options.finCount, options.graphic);
+  const pdfBytes = await generateTubePdf(pattern, "A4", label, options.labelColor, options.finCount, options.graphic, transitionPattern);
   await writeFile(options.output, pdfBytes);
   console.log(chalk.green(` done\n`));
   console.log(`  ${chalk.bold("PDF written to:")} ${chalk.cyan(options.output)}\n`);

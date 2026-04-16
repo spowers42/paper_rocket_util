@@ -102,6 +102,85 @@ export function cylinderPattern(
   };
 }
 
+/** Inner diameter of the FAI large end (mm) */
+export const FAI_LARGE_DIAMETER_MM = 40;
+
+/** Inner diameter of the FAI small end (mm) */
+export const FAI_SMALL_DIAMETER_MM = 13;
+
+/**
+ * Flat-pattern geometry for the FAI transition section (truncated cone / frustum).
+ *
+ * The flat pattern is an annular sector (a "washer wedge"):
+ *   - Outer arc radius R2 = r2 × slantHeight / (r2 − r1)
+ *   - Inner arc radius R1 = r1 × slantHeight / (r2 − r1)
+ *   - Sector angle θ = 2π × r2 / R2  (ensures outer arc length = large-end circumference)
+ *
+ * The overlap strip is an extra wedge whose outer arc has length = overlap.
+ * Its angular width = overlap / R2.
+ */
+export interface FrustumPattern {
+  /** Axial length of the frustum section (mm) */
+  length: number;
+  /** Inner diameter of the large end (mm) — always 40 for FAI */
+  largeDiameter: number;
+  /** Inner diameter of the small end (mm) — always 13 for FAI */
+  smallDiameter: number;
+  /** Slant height of the frustum (mm) */
+  slantHeight: number;
+  /** Flat-pattern outer arc radius (mm) — corresponds to large end */
+  outerRadius: number;
+  /** Flat-pattern inner arc radius (mm) — corresponds to small end */
+  innerRadius: number;
+  /** Sector angle of the main body (radians) */
+  sectorAngle: number;
+  /** Glue-seam overlap width measured as arc length at the outer radius (mm) */
+  overlap: number;
+}
+
+/**
+ * Calculates the flat-pattern geometry for the FAI transition section
+ * (truncated cone from 40 mm ID down to 13 mm ID).
+ *
+ * @param length  Axial length of the transition section (mm)
+ * @param overlap Glue-seam overlap width (mm) — same value used for the cylinder
+ */
+export function frustumPattern(length: number, overlap: number): FrustumPattern {
+  const r1 = FAI_SMALL_DIAMETER_MM / 2; // 6.5 mm
+  const r2 = FAI_LARGE_DIAMETER_MM / 2; // 20 mm
+  const slantHeight = Math.sqrt((r2 - r1) ** 2 + length ** 2);
+  const outerRadius = (r2 * slantHeight) / (r2 - r1);
+  const innerRadius = (r1 * slantHeight) / (r2 - r1);
+  const sectorAngle = (2 * Math.PI * r2) / outerRadius;
+  return {
+    length,
+    largeDiameter: FAI_LARGE_DIAMETER_MM,
+    smallDiameter: FAI_SMALL_DIAMETER_MM,
+    slantHeight,
+    outerRadius,
+    innerRadius,
+    sectorAngle,
+    overlap,
+  };
+}
+
+/**
+ * Formats a FrustumPattern as a human-readable summary string.
+ */
+export function formatFrustumSummary(p: FrustumPattern): string {
+  const deg = (rad: number) => ((rad * 180) / Math.PI).toFixed(2);
+  return [
+    `Flat-pattern dimensions (transition):`,
+    `  Large end      : ${p.largeDiameter} mm ID`,
+    `  Small end      : ${p.smallDiameter} mm ID`,
+    `  Section length : ${p.length.toFixed(2)} mm`,
+    `  Slant height   : ${p.slantHeight.toFixed(3)} mm`,
+    `  Outer radius   : ${p.outerRadius.toFixed(3)} mm  (flat pattern)`,
+    `  Inner radius   : ${p.innerRadius.toFixed(3)} mm  (flat pattern)`,
+    `  Sector angle   : ${deg(p.sectorAngle)}°`,
+  ].join("\n");
+}
+
 /**
  * Formats a CylinderPattern as a human-readable summary string.
  */

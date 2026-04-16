@@ -13,7 +13,7 @@ import {
   GRAPHIC_MARGIN_MM,
   GRAPHIC_MAX_WIDTH_RATIO,
 } from "../pdf.js";
-import { cylinderPattern } from "../geometry.js";
+import { cylinderPattern, frustumPattern } from "../geometry.js";
 
 describe("mm", () => {
   it("converts 25.4 mm to exactly 72 pt (one inch)", () => {
@@ -247,5 +247,47 @@ describe("calculateGraphicPlacement", () => {
     // Extremely tall image: center at 1/3 would push top edge above margin
     const p = calculateGraphicPlacement(10, 1000, bodyWidth, segHeight);
     expect(p.y).toBeGreaterThanOrEqual(GRAPHIC_MARGIN_MM);
+  });
+});
+
+describe("generateTubePdf with frustum transition page", () => {
+  it("appends exactly one extra page (transition + shoulder combined) when a frustum pattern is provided", async () => {
+    const pattern = cylinderPattern(40, 200, 6.35);
+    const frustum = frustumPattern(50, 6.35);
+    const withFrustum = await generateTubePdf(pattern, "A4", undefined, undefined, undefined, undefined, frustum);
+    const without = await generateTubePdf(pattern);
+    const docWith = await PDFDocument.load(withFrustum);
+    const docWithout = await PDFDocument.load(without);
+    expect(docWith.getPageCount()).toBe(docWithout.getPageCount() + 1);
+  });
+
+  it("produces a valid PDF when a frustum pattern is provided", async () => {
+    const pattern = cylinderPattern(40, 200, 6.35);
+    const frustum = frustumPattern(50, 6.35);
+    const bytes = await generateTubePdf(pattern, "A4", undefined, undefined, undefined, undefined, frustum);
+    const header = Buffer.from(bytes.slice(0, 5)).toString("ascii");
+    expect(header).toBe("%PDF-");
+  });
+
+  it("frustum page uses the same page dimensions as cylinder pages", async () => {
+    const pattern = cylinderPattern(40, 200, 6.35);
+    const frustum = frustumPattern(50, 6.35);
+    const bytes = await generateTubePdf(pattern, "A4", undefined, undefined, undefined, undefined, frustum);
+    const doc = await PDFDocument.load(bytes);
+    const pages = doc.getPages();
+    const { width: w0, height: h0 } = pages[0].getSize();
+    const { width: wLast, height: hLast } = pages[pages.length - 1].getSize();
+    expect(wLast).toBeCloseTo(w0, 1);
+    expect(hLast).toBeCloseTo(h0, 1);
+  });
+
+  it("works for various transition lengths", async () => {
+    const pattern = cylinderPattern(40, 200, 6.35);
+    for (const len of [25, 50, 80, 120]) {
+      const frustum = frustumPattern(len, 6.35);
+      const bytes = await generateTubePdf(pattern, "A4", undefined, undefined, undefined, undefined, frustum);
+      const header = Buffer.from(bytes.slice(0, 5)).toString("ascii");
+      expect(header).toBe("%PDF-");
+    }
   });
 });
