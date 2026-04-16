@@ -14,10 +14,14 @@ export type TubeDiameter = (typeof VALID_DIAMETERS)[number];
 
 export const DEFAULT_OVERLAP_MM = 6.35; // 1/4 inch
 
+export type PageSize = "Letter" | "A4";
+export const DEFAULT_PAGE_SIZE: PageSize = "Letter";
+
 export interface TubeOptions {
   diameter: TubeDiameter;
   length: number;            // mm
   overlap: number;           // mm, glue seam strip
+  pageSize: PageSize;
   output: string;            // file path for PDF
   name?: string;
   license?: string;
